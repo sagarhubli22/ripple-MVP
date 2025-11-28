@@ -72,16 +72,18 @@ export function LivePollCard({ poll }: LivePollCardProps) {
 
             {!submitted && options.length > 0 && (
                 <div className="space-y-2">
-                    {options.map((option, index) => (
-                        <button
-                            key={index}
-                            onClick={() => handleSubmit(option)}
-                            disabled={loading}
-                            className="w-full rounded-md border border-slate-700 bg-slate-800/50 px-4 py-3 text-left text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
-                        >
-                            {option}
-                        </button>
-                    ))}
+                    {options
+                        .filter((option): option is string => option !== null)
+                        .map((option, index) => (
+                            <button
+                                key={index}
+                                onClick={() => handleSubmit(option)}
+                                disabled={loading}
+                                className="w-full rounded-md border border-slate-700 bg-slate-800/50 px-4 py-3 text-left text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
+                            >
+                                {option}
+                            </button>
+                        ))}
                 </div>
             )}
 
