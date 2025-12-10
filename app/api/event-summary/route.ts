@@ -338,7 +338,25 @@ export async function POST(request: NextRequest) {
     // Increment summary generated count
     await supabase.rpc("increment_summary_count", { event_id_param: eventId });
 
-    return NextResponse.json({ summary });
+    return NextResponse.json({
+      summary,
+      stats: {
+        totalAttendees,
+        averageRating,
+        feedbackCount,
+      },
+      feedback: feedback.map(f => ({
+        rating: f.rating,
+        comment: f.comment,
+        created_at: f.created_at,
+        sentiment: f.sentiment
+      })),
+      event: {
+        name: event.name,
+        date: event.date,
+        ended_at: event.ended_at
+      }
+    });
   } catch (error) {
     console.error("Error generating summary:", error);
     return NextResponse.json(

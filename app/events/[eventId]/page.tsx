@@ -7,6 +7,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { AuthGuard } from "../../../components/AuthGuard";
 import { getSupabaseClient } from "../../../lib/supabaseClient";
 import { Event, Session } from "../../../lib/analytics/types";
+import { generateEventFeedbackPdf } from "../../../lib/pdfGenerator";
 
 export default function EventDetailPage() {
     const params = useParams();
@@ -18,6 +19,8 @@ export default function EventDetailPage() {
     const [error, setError] = useState<string | null>(null);
     const [copySuccess, setCopySuccess] = useState(false);
     const [showQR, setShowQR] = useState(false);
+    const [endingEvent, setEndingEvent] = useState(false);
+    const [generatingPdf, setGeneratingPdf] = useState(false);
 
     useEffect(() => {
         const supabase = getSupabaseClient();
@@ -79,6 +82,74 @@ export default function EventDetailPage() {
             } catch (fallbackErr) {
                 console.error("Failed to copy link:", fallbackErr);
             }
+        }
+    };
+
+    const handleEndEvent = async () => {
+        const supabase = getSupabaseClient();
+        if (!event || !supabase) return;
+
+        if (!window.confirm("Are you sure you want to end this event? This will prevent further interactions.")) {
+            return;
+        }
+
+        setEndingEvent(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Not authenticated");
+
+            const response = await fetch(`/api/events/${eventId}/end`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${session.access_token}`,
+                },
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || "Failed to end event");
+            }
+
+            const data = await response.json();
+            setEvent(data.event);
+        } catch (err) {
+            console.error("Error ending event:", err);
+            alert("Failed to end event. Please try again.");
+        } finally {
+            setEndingEvent(false);
+        }
+    };
+
+    const handleDownloadPdf = async () => {
+        const supabase = getSupabaseClient();
+        if (!event || !supabase) return;
+        setGeneratingPdf(true);
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Not authenticated");
+
+            const response = await fetch("/api/event-summary", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ eventId }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || "Failed to generate summary");
+            }
+
+            const data = await response.json();
+            generateEventFeedbackPdf(data.event, data.summary, data.stats, data.feedback);
+        } catch (err) {
+            console.error("Error generating PDF:", err);
+            alert("Failed to generate PDF. Please try again.");
+        } finally {
+            setGeneratingPdf(false);
         }
     };
 
@@ -163,6 +234,29 @@ export default function EventDetailPage() {
                         )}
                     </div>
                     <div className="flex gap-3">
+                        {event.status !== 'ended' ? (
+                            <button
+                                onClick={handleEndEvent}
+                                disabled={endingEvent}
+                                className="rounded-md border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                            >
+                                {endingEvent ? "Ending..." : "End Event"}
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-slate-300">
+                                <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                                Ended {event.ended_at ? new Date(event.ended_at).toLocaleDateString() : ""}
+                            </div>
+                        )}
+                        {event.status === 'ended' && (
+                            <button
+                                onClick={handleDownloadPdf}
+                                disabled={generatingPdf}
+                                className="rounded-md border border-indigo-500/50 bg-indigo-500/10 px-4 py-2 text-sm text-indigo-400 hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
+                            >
+                                {generatingPdf ? "Generating PDF..." : "Download Summary (PDF)"}
+                            </button>
+                        )}
                         <Link
                             href={`/events/${eventId}/analytics`}
                             className="rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700 transition-colors"

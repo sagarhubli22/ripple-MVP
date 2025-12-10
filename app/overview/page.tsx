@@ -13,6 +13,8 @@ interface Event {
   name: string;
   description: string | null;
   date: string | null;
+  status?: 'active' | 'ended';
+  ended_at?: string | null;
   created_at: string;
 }
 
@@ -44,6 +46,7 @@ export default function OverviewPage() {
   const [copySuccess, setCopySuccess] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
 
   const supabase = getSupabaseClient();
 
@@ -257,6 +260,14 @@ export default function OverviewPage() {
 
   const feedbackUrl = typeof window !== 'undefined' && selectedEventId ? `${window.location.origin}/events/${selectedEventId}/feedback` : '';
 
+  const filteredEvents = events.filter(event => {
+    if (activeTab === 'active') {
+      return !event.status || event.status === 'active';
+    } else {
+      return event.status === 'ended';
+    }
+  });
+
   if (loading) {
     return (
       <AuthGuard>
@@ -289,66 +300,108 @@ export default function OverviewPage() {
             <h2 className="text-xl font-semibold text-white">Events</h2>
           </div>
 
-          {/* New Event Form */}
-          <form
-            onSubmit={handleCreateEvent}
-            className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/40 p-4"
-          >
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newEventName}
-                onChange={(e) => setNewEventName(e.target.value)}
-                placeholder="Event name"
-                className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                disabled={creatingEvent}
-              />
-              <input
-                type="datetime-local"
-                value={newEventDate}
-                onChange={(e) => setNewEventDate(e.target.value)}
-                className="w-56 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                disabled={creatingEvent}
-              />
-            </div>
-            <textarea
-              value={newEventDescription}
-              onChange={(e) => setNewEventDescription(e.target.value)}
-              placeholder="Event description (optional)"
-              className="min-h-[80px] w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              disabled={creatingEvent}
-            />
+          {/* Tabs */}
+          <div className="flex space-x-1 rounded-lg bg-slate-900/40 p-1 border border-slate-800 w-fit">
             <button
-              type="submit"
-              disabled={creatingEvent || !newEventName.trim()}
-              className="w-full rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setActiveTab('active')}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all ${activeTab === 'active'
+                ? 'bg-indigo-500 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
             >
-              {creatingEvent ? "Creating..." : "Create Event"}
+              Active Events
             </button>
-          </form>
+            <button
+              onClick={() => setActiveTab('past')}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-all ${activeTab === 'past'
+                ? 'bg-indigo-500 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+            >
+              Past Events
+            </button>
+          </div>
+
+          {/* New Event Form - Only show for Active tab */}
+          {activeTab === 'active' && (
+            <form
+              onSubmit={handleCreateEvent}
+              className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/40 p-4"
+            >
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newEventName}
+                  onChange={(e) => setNewEventName(e.target.value)}
+                  placeholder="Event name"
+                  className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  disabled={creatingEvent}
+                />
+                <input
+                  type="datetime-local"
+                  value={newEventDate}
+                  onChange={(e) => setNewEventDate(e.target.value)}
+                  className="w-56 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  disabled={creatingEvent}
+                />
+              </div>
+              <textarea
+                value={newEventDescription}
+                onChange={(e) => setNewEventDescription(e.target.value)}
+                placeholder="Event description (optional)"
+                className="min-h-[80px] w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                disabled={creatingEvent}
+              />
+              <button
+                type="submit"
+                disabled={creatingEvent || !newEventName.trim()}
+                className="w-full rounded-md bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {creatingEvent ? "Creating..." : "Create Event"}
+              </button>
+            </form>
+          )}
 
           {/* Events List */}
-          {events.length === 0 ? (
+          {filteredEvents.length === 0 ? (
             <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-8 text-center text-slate-400">
-              No events yet. Create your first event above.
+              {activeTab === 'active'
+                ? "No active events. Create one above."
+                : "No past events found."}
             </div>
           ) : (
             <div className="grid gap-3">
-              {events.map((event) => (
+              {filteredEvents.map((event) => (
                 <button
                   key={event.id}
-                  onClick={() => setSelectedEventId(event.id)}
+                  onClick={() => {
+                    if (activeTab === 'active') {
+                      setSelectedEventId(event.id);
+                    } else {
+                      // For past events, navigate to details page
+                      window.location.href = `/events/${event.id}`;
+                    }
+                  }}
                   className={`rounded-lg border p-4 text-left transition-colors ${selectedEventId === event.id
                     ? "border-indigo-500 bg-indigo-500/20"
                     : "border-slate-800 bg-slate-900/40 hover:border-slate-700"
                     }`}
                 >
-                  <div className="font-medium text-white">{event.name}</div>
-                  {event.description && (
-                    <div className="mt-1 text-sm text-slate-300">
-                      {event.description}
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-medium text-white">{event.name}</div>
+                      {event.description && (
+                        <div className="mt-1 text-sm text-slate-300">
+                          {event.description}
+                        </div>
+                      )}
                     </div>
-                  )}
+                    {event.status === 'ended' && (
+                      <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-red-300 border border-red-500/30">
+                        Ended
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-1 text-xs text-slate-400 flex items-center gap-2 flex-wrap">
                     <span>
                       Created {new Date(event.created_at).toLocaleDateString()}
@@ -356,6 +409,11 @@ export default function OverviewPage() {
                     {event.date && (
                       <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-300">
                         Event {new Date(event.date).toLocaleString()}
+                      </span>
+                    )}
+                    {event.ended_at && (
+                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] uppercase tracking-wide text-slate-400">
+                        Ended {new Date(event.ended_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
