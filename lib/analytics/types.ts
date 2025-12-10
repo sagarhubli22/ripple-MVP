@@ -4,7 +4,8 @@ export interface Event {
   name: string;
   description: string | null;
   date: string | null;
-  status?: 'active' | 'ended';
+  status?: 'active' | 'ended' | 'deleted';
+  deleted_at?: string | null;
   ended_at?: string | null;
   created_at: string;
 }

@@ -13,7 +13,7 @@ interface Event {
   name: string;
   description: string | null;
   date: string | null;
-  status?: 'active' | 'ended';
+  status?: 'active' | 'ended' | 'deleted';
   ended_at?: string | null;
   created_at: string;
 }
@@ -261,6 +261,8 @@ export default function OverviewPage() {
   const feedbackUrl = typeof window !== 'undefined' && selectedEventId ? `${window.location.origin}/events/${selectedEventId}/feedback` : '';
 
   const filteredEvents = events.filter(event => {
+    if (event.status === 'deleted') return false;
+
     if (activeTab === 'active') {
       return !event.status || event.status === 'active';
     } else {

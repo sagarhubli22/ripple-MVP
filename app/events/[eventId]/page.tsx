@@ -21,6 +21,7 @@ export default function EventDetailPage() {
     const [showQR, setShowQR] = useState(false);
     const [endingEvent, setEndingEvent] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
+    const [deletingEvent, setDeletingEvent] = useState(false);
 
     useEffect(() => {
         const supabase = getSupabaseClient();
@@ -153,6 +154,40 @@ export default function EventDetailPage() {
         }
     };
 
+    const handleDeleteEvent = async () => {
+        const supabase = getSupabaseClient();
+        if (!event || !supabase) return;
+
+        if (!window.confirm("Are you sure you want to delete this event? This will remove it from your dashboard and hide all associated feedback. This cannot be undone from the app.")) {
+            return;
+        }
+
+        setDeletingEvent(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Not authenticated");
+
+            const response = await fetch(`/api/events/${eventId}/delete`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${session.access_token}`,
+                },
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || "Failed to delete event");
+            }
+
+            // Redirect to dashboard on success
+            window.location.href = "/overview";
+        } catch (err) {
+            console.error("Error deleting event:", err);
+            alert("Failed to delete event. Please try again.");
+            setDeletingEvent(false);
+        }
+    };
+
     const formatDate = (date: string | null) => {
         if (!date) return "No date set";
         try {
@@ -174,12 +209,12 @@ export default function EventDetailPage() {
         );
     }
 
-    if (error || !event) {
+    if (error || !event || event.status === 'deleted') {
         return (
             <AuthGuard>
                 <div className="mx-auto max-w-7xl px-4 py-8">
                     <div className="rounded-lg border border-red-500/50 bg-red-500/20 p-4 text-red-300">
-                        {error || "Event not found"}
+                        {event?.status === 'deleted' ? "This event has been deleted." : (error || "Event not found")}
                     </div>
                     <Link
                         href="/overview"
@@ -329,6 +364,23 @@ export default function EventDetailPage() {
                         </div>
                     </div>
                 )}
+
+                {/* Danger Zone */}
+                <section className="mt-12 rounded-lg border border-red-500/20 bg-red-500/5 p-6">
+                    <h3 className="text-lg font-medium text-red-400">Danger Zone</h3>
+                    <p className="mt-2 text-sm text-slate-400">
+                        Deleting this event will remove it from your dashboard and hide all associated feedback and analytics. This action cannot be undone from the app.
+                    </p>
+                    <div className="mt-4">
+                        <button
+                            onClick={handleDeleteEvent}
+                            disabled={deletingEvent}
+                            className="rounded-md bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 border border-red-500/30"
+                        >
+                            {deletingEvent ? "Deleting..." : "Delete Event"}
+                        </button>
+                    </div>
+                </section>
             </div>
         </AuthGuard>
     );
